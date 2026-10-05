@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full w-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>玉帶鳳蝶 (Papilio polytes) 博物館級 3D 展覽與拆解系統</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js Core -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- GSAP for smooth animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,400&family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            background-color: #0b0c10;
+            color: #e2e8f0;
+        }
+
+        .font-serif-title {
+            font-family: 'Cormorant Garamond', 'Noto Serif TC', serif;
+        }
+
+        .museum-panel {
+            background: rgba(18, 22, 28, 0.82);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+        }
+
+        .btn-museum {
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: #e5e7eb;
+        }
+
+        .btn-museum:hover {
+            background: rgba(212, 175, 55, 0.2);
+            border-color: rgba(245, 208, 110, 0.8);
+            color: #fef08a;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+        }
+
+        .btn-museum.active {
+            background: rgba(212, 175, 55, 0.3);
+            border-color: #f59e0b;
+            color: #fef08a;
+            box-shadow: 0 0 18px rgba(245, 158, 11, 0.4);
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 5px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 3px;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #d4af37;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -5px;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.8);
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+        }
+
+        .panel-collapsed {
+            max-height: 52px !important;
+            overflow: hidden !important;
+        }
+    </style>
+</head>
+<body class="h-full w-full relative">
+    <!-- 3D WebGL Canvas Container -->
+    <div id="webgl-container" class="absolute inset-0 z-0"></div>
+
+    <!-- Header Title Bar -->
+    <header class="absolute top-4 left-4 right-4 z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center pointer-events-none gap-3">
+        <div class="museum-panel rounded-2xl p-4 flex items-center space-x-4 pointer-events-auto border-l-4 border-l-amber-500">
+            <div class="w-12 h-12 rounded-xl bg-amber-950/60 border border-amber-500/40 flex items-center justify-center text-amber-400 text-2xl shrink-0">
+                <i class="ph-light ph-butterfly"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-[10px] tracking-widest font-mono uppercase text-amber-400/90 font-semibold">Museum Specimen Gallery</span>
+                    <span class="text-[9px] px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700/60 font-mono">Papilionidae</span>
+                </div>
+                <h1 class="font-serif-title text-xl sm:text-2xl font-bold tracking-wide text-slate-100">玉帶鳳蝶 <span class="text-sm font-normal text-amber-200/70 italic">(Papilio polytes)</span></h1>
+            </div>
+        </div>
+
+        <!-- Display Mode Quick Controls -->
+        <div class="museum-panel rounded-2xl p-2 flex items-center space-x-2 pointer-events-auto flex-wrap gap-y-2">
+            <div class="flex items-center space-x-1 bg-black/40 p-1 rounded-xl border border-amber-500/20 mr-2">
+                <span class="text-[10px] text-amber-400 font-mono px-2">型態 Morph:</span>
+                <button id="btn-morph-male" class="btn-museum active px-2.5 py-1 rounded-lg text-xs font-medium">雄蝶 (Male)</button>
+                <button id="btn-morph-cyrus" class="btn-museum px-2.5 py-1 rounded-lg text-xs font-medium">雌蝶-白帶型</button>
+                <button id="btn-morph-polytes" class="btn-museum px-2.5 py-1 rounded-lg text-xs font-medium text-red-300">雌蝶-紅斑型</button>
+            </div>
+
+            <button id="btn-toggle-flight" class="btn-museum px-3.5 py-2 rounded-xl text-xs font-medium flex items-center space-x-2">
+                <i class="ph-light ph-wind text-base text-amber-400"></i>
+                <span id="txt-flight-state">開啟飛行動畫</span>
+            </button>
+            <button id="btn-toggle-blueprint" class="btn-museum px-3.5 py-2 rounded-xl text-xs font-medium flex items-center space-x-2">
+                <i class="ph-light ph-cube-transparent text-base text-cyan-400"></i>
+                <span>藍圖模式 (Blueprint)</span>
+            </button>
+            <button id="btn-reset-view" class="btn-museum px-3 py-2 rounded-xl text-xs font-medium flex items-center space-x-1 text-slate-300">
+                <i class="ph-light ph-arrows-counter-clockwise text-base"></i>
+                <span>重設視角</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Collapsible Control Panel (Bottom-Left) -->
+    <main id="control-panel" class="absolute bottom-4 left-4 z-10 w-80 sm:w-96 museum-panel rounded-2xl p-4 transition-all duration-300 space-y-4 pointer-events-auto">
+        <div class="flex justify-between items-center border-b border-amber-500/20 pb-2.5">
+            <span class="text-xs font-bold text-amber-400 tracking-wider uppercase flex items-center">
+                <i class="ph-light ph-sliders-horizontal mr-2 text-base"></i>標本結構與解剖調控
+            </span>
+            <button id="btn-collapse-panel" class="text-slate-400 hover:text-amber-300 p-1 rounded-lg hover:bg-slate-800/60 transition">
+                <i id="icon-collapse" class="ph-light ph-caret-down text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Exploded View Slider -->
+        <div class="space-y-1.5">
+            <div class="flex justify-between text-xs">
+                <span class="text-slate-300 font-medium flex items-center">
+                    <i class="ph-light ph-arrows-out-cardinal mr-1.5 text-amber-400"></i>解剖拆解程度 (Explode)
+                </span>
+                <span id="val-explode" class="font-mono text-amber-300 font-semibold">0% (完全組裝)</span>
+            </div>
+            <input id="slider-explode" type="range" min="0" max="100" value="0" class="w-full">
+            <div class="flex justify-between text-[10px] text-slate-500">
+                <span>組裝狀態</span>
+                <span>半拆解</span>
+                <span>完全拆解</span>
+            </div>
+        </div>
+
+        <!-- Flight Speed Slider (Active when flying) -->
+        <div id="wrapper-speed" class="space-y-1.5 opacity-50 pointer-events-none transition-opacity">
+            <div class="flex justify-between text-xs">
+                <span class="text-slate-300 font-medium flex items-center">
+                    <i class="ph-light ph-gauge mr-1.5 text-amber-400"></i>拍翼慢放頻率 (Speed)
+                </span>
+                <span id="val-speed" class="font-mono text-amber-300">1.2 Hz (教學慢放)</span>
+            </div>
+            <input id="slider-speed" type="range" min="0.3" max="5.0" step="0.1" value="1.2" class="w-full">
+        </div>
+
+        <!-- Quick Explode Shortcuts -->
+        <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
+            <button id="btn-assemble-quick" class="btn-museum py-1.5 px-3 rounded-lg text-xs flex items-center justify-center space-x-1.5">
+                <i class="ph-light ph-arrows-in"></i>
+                <span>一鍵組裝</span>
+            </button>
+            <button id="btn-explode-quick" class="btn-museum py-1.5 px-3 rounded-lg text-xs flex items-center justify-center space-x-1.5">
+                <i class="ph-light ph-arrows-out"></i>
+                <span>一鍵完全拆解</span>
+            </button>
+        </div>
+    </main>
+
+    <!-- Right Side Anatomical Inspector -->
+    <aside id="inspector-card" class="absolute top-20 right-4 z-10 w-72 sm:w-80 museum-panel rounded-2xl p-4 space-y-3 pointer-events-auto hidden sm:block">
+        <div class="flex justify-between items-center border-b border-amber-500/20 pb-2">
+            <div class="text-xs font-bold text-amber-400 tracking-wider uppercase flex items-center">
+                <i class="ph-light ph-info mr-1.5 text-base"></i>構造特徵解讀
+            </div>
+            <span id="inspect-part-code" class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700/50">WHOLE SPECIMEN</span>
+        </div>
+        <div>
+            <h3 id="inspect-part-title" class="font-serif-title text-lg font-bold text-slate-100">雄性玉帶鳳蝶標本</h3>
+            <p id="inspect-part-desc" class="text-xs text-slate-300 leading-relaxed mt-1.5">
+                點擊畫面中的蝴蝶部位（如前翅、後翅、頭部、腹部）進行深入觀察。雄蝶後翅貫穿一條由 7 個象牙白色斑塊組成的「玉帶」，邊緣帶有優雅的尾突。
+            </p>
+        </div>
+    </aside>
+
+    <script>
+        // Global Scene Variables
+        let scene, camera, renderer, controls;
+        let butterflyGroup;
+        let raycaster, mouse;
+        let isExploded = false;
+        let explodeRatio = 0;
+        let isFlying = true;
+        let isBlueprint = false;
+        let currentMorph = 'male'; // 'male', 'cyrus', 'polytes'
+        let clock = new THREE.Clock();
+
+        // Anatomical Parts Store
+        const butterflyParts = {};
+        const originalMaterials = {};
+        let blueprintMaterial;
+
+        // Exploded View Offsets
+        const explodeOffsets = {
+            head: new THREE.Vector3(0, 0.2, 0.8),
+            antennaeL: new THREE.Vector3(0.3, 0.4, 1.2),
+            antennaeR: new THREE.Vector3(-0.3, 0.4, 1.2),
+            thorax: new THREE.Vector3(0, 0, 0),
+            abdomen: new THREE.Vector3(0, -0.3, -1.0),
+            forewingL: new THREE.Vector3(1.8, 0.6, 0.5),
+            forewingR: new THREE.Vector3(-1.8, 0.6, 0.5),
+            hindwingL: new THREE.Vector3(1.5, -0.5, -0.8),
+            hindwingR: new THREE.Vector3(-1.5, -0.5, -0.8)
+        };
+
+        // Kinematic Flight State
+        let flightTime = 0;
+        let flightSpeed = 1.2;
+
+        function createWingBumpMap(isForewing) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 4096; canvas.height = 4096;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#808080';
+            ctx.fillRect(0, 0, 4096, 4096);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+            for (let i = 0; i < 40000; i++) {
+                ctx.fillRect(Math.random() * 4096, Math.random() * 4096, 2, 2);
+            }
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 10;
+            ctx.lineWidth = 36;
+
+            const veins = isForewing ? [
+                [[400, 400], [1600, 700], [3700, 600]],
+                [[400, 400], [1800, 1500], [3840, 1500]],
+                [[400, 400], [1900, 2200], [3760, 2360]],
+                [[400, 400], [1700, 2800], [3400, 3100]],
+                [[400, 400], [1200, 3200], [2800, 3600]]
+            ] : [
+                [[300, 300], [1600, 1200], [3300, 3300]],
+                [[300, 300], [1800, 2200], [2200, 3700]],
+                [[1300, 1300], [2800, 1800], [3600, 2400]]
+            ];
+
+            veins.forEach(v => {
+                ctx.beginPath();
+                ctx.moveTo(v[0][0], v[0][1]);
+                for (let i = 1; i < v.length; i++) ctx.lineTo(v[i][0], v[i][1]);
+                ctx.stroke();
+            });
+
+            const bumpTex = new THREE.CanvasTexture(canvas);
+            bumpTex.wrapS = THREE.ClampToEdgeWrapping;
+            bumpTex.wrapT = THREE.ClampToEdgeWrapping;
+            return bumpTex;
+        }
+
+        function createForewingTexture(morph) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 4096; canvas.height = 4096;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = morph === 'cyrus' ? '#14161b' : '#0a0b0e';
+            ctx.fillRect(0, 0, 4096, 4096);
+
+            if (morph === 'polytes') {
+                const grad = ctx.createRadialGradient(2400, 1800, 200, 2400, 1800, 1600);
+                grad.addColorStop(0, 'rgba(215, 215, 210, 0.55)');
+                grad.addColorStop(0.6, 'rgba(180, 180, 175, 0.28)');
+                grad.addColorStop(1, 'rgba(10, 11, 14, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.ellipse(2400, 1800, 1300, 1000, -0.3, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.save();
+                ctx.translate(400, 400);
+                for (let i = 0; i < 32; i++) {
+                    const angle = 0.08 + i * 0.04;
+                    const rayGrad = ctx.createLinearGradient(0, 0, 3600 * Math.cos(angle), 3600 * Math.sin(angle));
+                    rayGrad.addColorStop(0, 'rgba(10,11,14,0)');
+                    rayGrad.addColorStop(0.25, morph === 'cyrus' ? 'rgba(180,170,145,0.35)' : 'rgba(150,140,115,0.22)');
+                    rayGrad.addColorStop(0.75, morph === 'cyrus' ? 'rgba(210,200,170,0.50)' : 'rgba(175,165,135,0.32)');
+                    rayGrad.addColorStop(1, 'rgba(10,11,14,0)');
+
+                    ctx.fillStyle = rayGrad;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(3700 * Math.cos(angle - 0.01), 3700 * Math.sin(angle - 0.01));
+                    ctx.lineTo(3700 * Math.cos(angle + 0.01), 3700 * Math.sin(angle + 0.01));
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                ctx.fillStyle = '#fffdf0';
+                ctx.shadowColor = '#fffdf0';
+                ctx.shadowBlur = 8;
+                for (let i = 0; i < 11; i++) {
+                    const progress = i / 10;
+                    const x = 3620 - progress * 850;
+                    const y = 620 + progress * 2850;
+                    const radius = 24 * (1 - progress * 0.45);
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#020304';
+            ctx.lineWidth = 34;
+            ctx.lineCap = 'round';
+            const veins = [
+                [[400, 400], [1600, 700], [3700, 600]],
+                [[400, 400], [1800, 1500], [3840, 1500]],
+                [[400, 400], [1900, 2200], [3760, 2360]],
+                [[400, 400], [1700, 2800], [3400, 3100]],
+                [[400, 400], [1200, 3200], [2800, 3600]]
+            ];
+            veins.forEach(v => {
+                ctx.beginPath();
+                ctx.moveTo(v[0][0], v[0][1]);
+                for (let i = 1; i < v.length; i++) ctx.lineTo(v[i][0], v[i][1]);
+                ctx.stroke();
+            });
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.ClampToEdgeWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            return tex;
+        }
+
+        function createHindwingTexture(morph) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 4096; canvas.height = 4096;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = morph === 'cyrus' ? '#121418' : '#050608';
+            ctx.fillRect(0, 0, 4096, 4096);
+
+            if (morph === 'polytes') {
+                const whitePatches = [
+                    {x: 1600, y: 1600, rx: 160, ry: 320, rot: 0.1},
+                    {x: 1950, y: 2000, rx: 180, ry: 360, rot: 0.25},
+                    {x: 2250, y: 2450, rx: 170, ry: 340, rot: 0.4},
+                    {x: 2500, y: 2850, rx: 140, ry: 280, rot: 0.55}
+                ];
+                whitePatches.forEach(p => {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rot);
+                    const g = ctx.createRadialGradient(0, 0, 10, 0, 0, p.ry);
+                    g.addColorStop(0, '#ffffff');
+                    g.addColorStop(0.8, '#fffbea');
+                    g.addColorStop(1, 'rgba(5,6,8,0)');
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, p.rx, p.ry, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                const redCrescents = [
+                    {x: 3050, y: 1250, rot: 0.2},
+                    {x: 3220, y: 1700, rot: 0.4},
+                    {x: 3280, y: 2180, rot: 0.6},
+                    {x: 3210, y: 2650, rot: 0.8},
+                    {x: 3000, y: 3080, rot: 1.0},
+                    {x: 2680, y: 3420, rot: 1.25}
+                ];
+                redCrescents.forEach(c => {
+                    ctx.save();
+                    ctx.translate(c.x, c.y);
+                    ctx.rotate(c.rot);
+                    ctx.fillStyle = '#dc2626';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 58, 0.1, Math.PI - 0.1, false);
+                    ctx.quadraticCurveTo(0, -15, 0, -28);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(0, 6, 32, 0.1, Math.PI - 0.1, false);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            } else {
+                const jadeSpots = [
+                    {x: 820, y: 680, w: 180, h: 320, rot: -0.28},
+                    {x: 1140, y: 1060, w: 210, h: 420, rot: -0.15},
+                    {x: 1500, y: 1520, w: 230, h: 480, rot: 0.05},
+                    {x: 1860, y: 2000, w: 220, h: 460, rot: 0.22},
+                    {x: 2180, y: 2460, w: 200, h: 400, rot: 0.38},
+                    {x: 2460, y: 2880, w: 170, h: 320, rot: 0.52},
+                    {x: 2680, y: 3220, w: 140, h: 250, rot: 0.65}
+                ];
+
+                jadeSpots.forEach(s => {
+                    ctx.save();
+                    ctx.translate(s.x, s.y);
+                    ctx.rotate(s.rot);
+                    const g = ctx.createRadialGradient(0, 0, 10, 0, 0, s.h / 2);
+                    g.addColorStop(0, '#ffffff');
+                    g.addColorStop(0.85, morph === 'cyrus' ? '#fef08a' : '#fffbeb');
+                    g.addColorStop(1, 'rgba(5,6,8,0)');
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, s.w / 2, s.h / 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                ctx.save();
+                ctx.translate(2580, 3480);
+                ctx.fillStyle = '#ea580c';
+                ctx.beginPath();
+                ctx.arc(0, 0, 52, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#050608';
+                ctx.beginPath();
+                ctx.arc(-8, -5, 18, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                const lunuleOpacity = morph === 'cyrus' ? 0.95 : 0.65;
+                const orangeLunules = [
+                    {x: 3120, y: 1320, rot: 0.2},
+                    {x: 3250, y: 1780, rot: 0.4},
+                    {x: 3290, y: 2260, rot: 0.6},
+                    {x: 3210, y: 2720, rot: 0.8},
+                    {x: 3020, y: 3120, rot: 1.0}
+                ];
+                orangeLunules.forEach(l => {
+                    ctx.save();
+                    ctx.translate(l.x, l.y);
+                    ctx.rotate(l.rot);
+                    ctx.fillStyle = `rgba(234, 88, 12, ${lunuleOpacity})`;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 42, 0.2, Math.PI - 0.2, false);
+                    ctx.quadraticCurveTo(0, -10, 0, -20);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+
+            ctx.fillStyle = '#f8fafc';
+            for (let i = 0; i < 10; i++) {
+                const angle = 0.20 + i * 0.135;
+                const x = 3450 * Math.cos(angle);
+                const y = 3450 * Math.sin(angle);
+                ctx.beginPath();
+                ctx.arc(x, y, 26, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.strokeStyle = '#020304';
+            ctx.lineWidth = 36;
+            ctx.beginPath();
+            ctx.moveTo(300, 300); ctx.lineTo(3300, 3300);
+            ctx.moveTo(300, 300); ctx.lineTo(2200, 3700);
+            ctx.moveTo(1300, 1300); ctx.lineTo(3600, 2400);
+            ctx.stroke();
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.ClampToEdgeWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            return tex;
+        }
+
+        function createMaterials() {
+            originalMaterials.chitin = new THREE.MeshStandardMaterial({
+                color: 0x121418,
+                roughness: 0.5,
+                metalness: 0.3
+            });
+
+            const foreBump = createWingBumpMap(true);
+            const hindBump = createWingBumpMap(false);
+
+            originalMaterials.forewing = new THREE.MeshStandardMaterial({
+                map: createForewingTexture(currentMorph),
+                bumpMap: foreBump,
+                bumpScale: 0.08,
+                roughness: 0.65,
+                metalness: 0.12,
+                side: THREE.DoubleSide
+            });
+
+            originalMaterials.hindwing = new THREE.MeshStandardMaterial({
+                map: createHindwingTexture(currentMorph),
+                bumpMap: hindBump,
+                bumpScale: 0.08,
+                roughness: 0.65,
+                metalness: 0.12,
+                side: THREE.DoubleSide
+            });
+
+            blueprintMaterial = new THREE.MeshBasicMaterial({
+                color: 0x0284c7,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.45
+            });
+        }
+
+        function switchMorph(newMorph) {
+            currentMorph = newMorph;
+            originalMaterials.forewing.map = createForewingTexture(currentMorph);
+            originalMaterials.forewing.map.needsUpdate = true;
+
+            originalMaterials.hindwing.map = createHindwingTexture(currentMorph);
+            originalMaterials.hindwing.map.needsUpdate = true;
+
+            document.getElementById('btn-morph-male').classList.toggle('active', currentMorph === 'male');
+            document.getElementById('btn-morph-cyrus').classList.toggle('active', currentMorph === 'cyrus');
+            document.getElementById('btn-morph-polytes').classList.toggle('active', currentMorph === 'polytes');
+
+            const titleEl = document.getElementById('inspect-part-title');
+            const codeEl = document.getElementById('inspect-part-code');
+            const descEl = document.getElementById('inspect-part-desc');
+
+            if (currentMorph === 'male') {
+                titleEl.innerText = "雄蝶 (Male Specimen)";
+                codeEl.innerText = "MORPH-MALE";
+                descEl.innerText = "雄蝶翅面為黑色，後翅貫穿一條由 7 個象牙白色斑塊組成的「玉帶」。臀角具有帶黑色瞳孔的橙紅斑點，外緣呈鋸齒狀並具匙狀尾突。";
+            } else if (currentMorph === 'cyrus') {
+                titleEl.innerText = "雌蝶 - 白帶型 (f. cyrus)";
+                codeEl.innerText = "MORPH-CYRUS";
+                descEl.innerText = "非擬態型雌蝶，外觀與雄蝶十分相似，但底色稍淺，且後翅外緣的橙紅色弦月紋比雄蝶更加發達鮮明。";
+            } else if (currentMorph === 'polytes') {
+                titleEl.innerText = "雌蝶 - 紅斑型 (f. polytes)";
+                codeEl.innerText = "MORPH-POLYTES";
+                descEl.innerText = "貝氏擬態型（Batesian Mimicry）：擬態有毒的「紅珠鳳蝶 (Pachliopta aristolochiae)」。前翅外側具顯著淡色斑塊，後翅中央具白色斑群，外緣環繞著亮麗的橙紅色弦月斑！";
+            }
+        }
+
+        function buildRealisticPapilioPolytes() {
+            butterflyGroup = new THREE.Group();
+            scene.add(butterflyGroup);
+
+            // 1. Thorax
+            const thoraxGroup = new THREE.Group();
+            thoraxGroup.name = "Thorax";
+            const thoraxGeo = new THREE.SphereGeometry(0.5, 24, 24);
+            thoraxGeo.scale(0.85, 0.9, 1.5);
+            const thoraxMesh = new THREE.Mesh(thoraxGeo, originalMaterials.chitin);
+            thoraxMesh.castShadow = true;
+            thoraxGroup.add(thoraxMesh);
+
+            const dotGeo = new THREE.SphereGeometry(0.035, 8, 8);
+            const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const dotPositions = [
+                [0.22, 0.28, 0.4], [-0.22, 0.28, 0.4],
+                [0.28, 0.2, 0.1], [-0.28, 0.2, 0.1],
+                [0.32, 0.0, -0.2], [-0.32, 0.0, -0.2],
+                [0.25, 0.22, -0.5], [-0.25, 0.22, -0.5]
+            ];
+            dotPositions.forEach(p => {
+                const dot = new THREE.Mesh(dotGeo, dotMat);
+                dot.position.set(p[0], p[1], p[2]);
+                thoraxGroup.add(dot);
+            });
+
+            butterflyGroup.add(thoraxGroup);
+            butterflyParts.thorax = thoraxGroup;
+
+            // 2. Head & Eyes
+            const headGroup = new THREE.Group();
+            headGroup.name = "Head";
+            headGroup.position.set(0, 0.08, 0.85);
+
+            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), originalMaterials.chitin);
+            headMesh.scale.set(1, 0.88, 0.95);
+            headGroup.add(headMesh);
+
+            [ [0.12, 0.18, 0.1], [-0.12, 0.18, 0.1], [0, 0.22, 0.08] ].forEach(p => {
+                const d = new THREE.Mesh(dotGeo, dotMat);
+                d.position.set(p[0], p[1], p[2]);
+                headGroup.add(d);
+            });
+
+            const eyeMat = new THREE.MeshStandardMaterial({ color: 0x08090a, roughness: 0.15, metalness: 0.85 });
+            const eyeGeo = new THREE.SphereGeometry(0.12, 12, 12);
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeL.position.set(0.18, 0.05, 0.08);
+            const eyeR = eyeL.clone();
+            eyeR.position.set(-0.18, 0.05, 0.08);
+            headGroup.add(eyeL, eyeR);
+
+            const proboscisCurve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, -0.1, 0.22),
+                new THREE.Vector3(0, -0.25, 0.32),
+                new THREE.Vector3(0, -0.2, 0.42),
+                new THREE.Vector3(0, -0.08, 0.36)
+            ]);
+            const proboscisMesh = new THREE.Mesh(
+                new THREE.TubeGeometry(proboscisCurve, 20, 0.012, 6, false),
+                originalMaterials.chitin
+            );
+            headGroup.add(proboscisMesh);
+
+            butterflyGroup.add(headGroup);
+            butterflyParts.head = headGroup;
+
+            // 3. Antennae
+            function createAntenna(isLeft) {
+                const group = new THREE.Group();
+                group.position.set(isLeft ? 0.12 : -0.12, 0.15, 0.25);
+
+                const curve = new THREE.CatmullRomCurve3([
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(isLeft ? 0.3 : -0.3, 0.45, 0.6),
+                    new THREE.Vector3(isLeft ? 0.65 : -0.65, 1.1, 1.3)
+                ]);
+                const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.014, 6, false), originalMaterials.chitin);
+                const club = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.25, 8), originalMaterials.chitin);
+                club.position.set(isLeft ? 0.65 : -0.65, 1.1, 1.3);
+                club.rotation.x = Math.PI / 4;
+
+                group.add(tube, club);
+                return group;
+            }
+
+            const antL = createAntenna(true);
+            const antR = createAntenna(false);
+            antL.name = "AntennaL"; antR.name = "AntennaR";
+            headGroup.add(antL, antR);
+            butterflyParts.antennaeL = antL;
+            butterflyParts.antennaeR = antR;
+
+            // 4. Abdomen
+            const abdoGroup = new THREE.Group();
+            abdoGroup.name = "Abdomen";
+            abdoGroup.position.set(0, -0.05, -0.75);
+
+            for (let i = 0; i < 8; i++) {
+                const r = 0.26 * (1 - i * 0.09);
+                const seg = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.88, 0.2, 16), originalMaterials.chitin);
+                seg.rotation.x = Math.PI / 2;
+                seg.position.set(0, -i * 0.02, -i * 0.18);
+                abdoGroup.add(seg);
+
+                if (i < 7) {
+                    const dL = new THREE.Mesh(dotGeo, dotMat);
+                    dL.position.set(r * 0.95, -i * 0.02, -i * 0.18);
+                    const dR = dL.clone();
+                    dR.position.x = -r * 0.95;
+                    abdoGroup.add(dL, dR);
+                }
+            }
+
+            butterflyGroup.add(abdoGroup);
+            butterflyParts.abdomen = abdoGroup;
+
+            // 5. Forewings
+            function createForewingMesh(isLeft) {
+                const shape = new THREE.Shape();
+                shape.moveTo(0, 0);
+                shape.bezierCurveTo(0.4, 0.5, 1.6, 1.4, 3.25, 1.32);  
+                shape.bezierCurveTo(3.45, 1.25, 3.5, 0.7, 3.3, 0.1); 
+                shape.bezierCurveTo(3.0, -0.9, 2.4, -1.6, 1.8, -1.75); 
+                shape.bezierCurveTo(1.1, -1.6, 0.4, -0.7, 0, 0);   
+
+                const geo = new THREE.ShapeGeometry(shape, 64);
+                geo.computeBoundingBox();
+                const bb = geo.boundingBox;
+                const pos = geo.attributes.position;
+                const uvs = new Float32Array(pos.count * 2);
+
+                for (let i = 0; i < pos.count; i++) {
+                    const x = pos.getX(i);
+                    const y = pos.getY(i);
+                    uvs[i * 2] = (x - bb.min.x) / (bb.max.x - bb.min.x);
+                    uvs[i * 2 + 1] = (y - bb.min.y) / (bb.max.y - bb.min.y);
+
+                    const normalizedX = x / 3.4;
+                    const zCurve = -Math.pow(normalizedX, 2) * 0.28 
+                                 + Math.sin(y * 1.2) * 0.08 
+                                 + Math.sin(x * 6.0) * 0.02;
+                    pos.setZ(i, zCurve);
+                }
+                geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+                geo.computeVertexNormals();
+
+                if (!isLeft) geo.scale(-1, 1, 1);
+
+                const mesh = new THREE.Mesh(geo, originalMaterials.forewing);
+                mesh.rotation.x = Math.PI / 2;
+                mesh.castShadow = true;
+                return mesh;
+            }
+
+            const fwMeshL = createForewingMesh(true);
+            const fwMeshR = createForewingMesh(false);
+
+            const fwGroupL = new THREE.Group(); fwGroupL.position.set(0.25, 0.1, 0.3); fwGroupL.add(fwMeshL);
+            const fwGroupR = new THREE.Group(); fwGroupR.position.set(-0.25, 0.1, 0.3); fwGroupR.add(fwMeshR);
+
+            fwGroupL.name = "ForewingL"; fwGroupR.name = "ForewingR";
+
+            butterflyGroup.add(fwGroupL, fwGroupR);
+            butterflyParts.forewingL = fwGroupL;
+            butterflyParts.forewingR = fwGroupR;
+
+            // 6. Hindwings
+            function createHindwingMesh(isLeft) {
+                const shape = new THREE.Shape();
+                shape.moveTo(0, 0);
+                shape.bezierCurveTo(0.5, 0.1, 1.2, -0.3, 1.8, -0.7);
+                shape.bezierCurveTo(2.1, -1.0, 2.3, -1.4, 2.25, -1.7);
+                shape.bezierCurveTo(2.4, -1.9, 2.35, -2.2, 2.2, -2.4);
+
+                // Spatulate Swallowtail Extension
+                shape.bezierCurveTo(2.35, -2.8, 2.25, -3.4, 2.0, -3.85);
+                shape.bezierCurveTo(1.7, -4.0, 1.45, -3.7, 1.55, -3.1);
+                shape.bezierCurveTo(1.65, -2.6, 1.5, -2.2, 1.2, -1.8);
+
+                shape.bezierCurveTo(0.7, -1.2, 0.3, -0.6, 0, 0);
+
+                const geo = new THREE.ShapeGeometry(shape, 64);
+                geo.computeBoundingBox();
+                const bb = geo.boundingBox;
+                const pos = geo.attributes.position;
+                const uvs = new Float32Array(pos.count * 2);
+
+                for (let i = 0; i < pos.count; i++) {
+                    const x = pos.getX(i);
+                    const y = pos.getY(i);
+                    uvs[i * 2] = (x - bb.min.x) / (bb.max.x - bb.min.x);
+                    uvs[i * 2 + 1] = (y - bb.min.y) / (bb.max.y - bb.min.y);
+
+                    const normalizedX = x / 2.4;
+                    const zCurve = -Math.pow(normalizedX, 2) * 0.24 
+                                 + Math.sin(y * 0.8) * 0.06 
+                                 - (y < -2.5 ? 0.12 : 0);
+                    pos.setZ(i, zCurve);
+                }
+                geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+                geo.computeVertexNormals();
+
+                if (!isLeft) geo.scale(-1, 1, 1);
+
+                const mesh = new THREE.Mesh(geo, originalMaterials.hindwing);
+                mesh.rotation.x = Math.PI / 2;
+                mesh.castShadow = true;
+                return mesh;
+            }
+
+            const hwMeshL = createHindwingMesh(true);
+            const hwMeshR = createHindwingMesh(false);
+
+            const hwGroupL = new THREE.Group(); hwGroupL.position.set(0.2, 0.05, -0.1); hwGroupL.add(hwMeshL);
+            const hwGroupR = new THREE.Group(); hwGroupR.position.set(-0.2, 0.05, -0.1); hwGroupR.add(hwMeshR);
+
+            hwGroupL.name = "HindwingL"; hwGroupR.name = "HindwingR";
+
+            butterflyGroup.add(hwGroupL, hwGroupR);
+            butterflyParts.hindwingL = hwGroupL;
+            butterflyParts.hindwingR = hwGroupR;
+
+            // Save default resting transforms
+            Object.keys(butterflyParts).forEach(key => {
+                const part = butterflyParts[key];
+                part.userData.defaultPos = part.position.clone();
+                part.userData.defaultRot = part.rotation.clone();
+            });
+        }
+
+        function init3DScene() {
+            const container = document.getElementById('webgl-container');
+
+            // 1. Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0b0c10, 0.035);
+
+            // 2. Camera setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 3.8, 8.5);
+
+            // 3. Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.1;
+            container.appendChild(renderer.domElement);
+
+            // 4. Controls setup
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 20;
+            controls.minDistance = 2;
+            controls.target.set(0, 0, 0);
+
+            // 5. Lighting setup
+            const ambientLight = new THREE.AmbientLight(0xfff8ed, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfffaed, 2.2);
+            dirLight.position.set(5, 10, 7);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            const rimLight = new THREE.PointLight(0x38bdf8, 1.8, 15);
+            rimLight.position.set(-6, -2, -5);
+            scene.add(rimLight);
+
+            const goldFill = new THREE.PointLight(0xf59e0b, 1.2, 12);
+            goldFill.position.set(4, -3, 3);
+            scene.add(goldFill);
+
+            // Shadow Plane
+            const shadowGeo = new THREE.PlaneGeometry(15, 15);
+            const shadowMat = new THREE.ShadowMaterial({ opacity: 0.35 });
+            const shadowPlane = new THREE.Mesh(shadowGeo, shadowMat);
+            shadowPlane.rotation.x = -Math.PI / 2;
+            shadowPlane.position.y = -2.5;
+            shadowPlane.receiveShadow = true;
+            scene.add(shadowPlane);
+
+            // Raycaster
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Materials & Butterfly
+            createMaterials();
+            buildRealisticPapilioPolytes();
+
+            // Listeners & Controls
+            setupUIControls();
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('click', onPointerClick);
+
+            // Start Animation Loop
+            animate();
+        }
+
+        function setExplodeRatio(ratio) {
+            explodeRatio = ratio;
+            document.getElementById('val-explode').innerText = `${Math.round(ratio * 100)}% (${ratio === 0 ? '完全組裝' : ratio === 1 ? '完全拆解' : '拆解中'})`;
+
+            Object.keys(explodeOffsets).forEach(partName => {
+                const part = butterflyParts[partName];
+                if (part && part.userData.defaultPos) {
+                    const offset = explodeOffsets[partName];
+                    const targetX = part.userData.defaultPos.x + offset.x * ratio;
+                    const targetY = part.userData.defaultPos.y + offset.y * ratio;
+                    const targetZ = part.userData.defaultPos.z + offset.z * ratio;
+
+                    gsap.to(part.position, {
+                        x: targetX,
+                        y: targetY,
+                        z: targetZ,
+                        duration: 0.4,
+                        ease: 'power2.out'
+                    });
+                }
+            });
+        }
+
+        function toggleBlueprintMode() {
+            isBlueprint = !isBlueprint;
+            const btn = document.getElementById('btn-toggle-blueprint');
+            btn.classList.toggle('active', isBlueprint);
+
+            butterflyGroup.traverse((child) => {
+                if (child.isMesh) {
+                    if (isBlueprint) {
+                        if (!child.userData.savedMaterial) {
+                            child.userData.savedMaterial = child.material;
+                        }
+                        child.material = blueprintMaterial;
+                    } else {
+                        if (child.userData.savedMaterial) {
+                            child.material = child.userData.savedMaterial;
+                        }
+                    }
+                }
+            });
+        }
+
+        function setupUIControls() {
+            document.getElementById('btn-morph-male').addEventListener('click', () => switchMorph('male'));
+            document.getElementById('btn-morph-cyrus').addEventListener('click', () => switchMorph('cyrus'));
+            document.getElementById('btn-morph-polytes').addEventListener('click', () => switchMorph('polytes'));
+
+            const sliderExplode = document.getElementById('slider-explode');
+            sliderExplode.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value) / 100;
+                setExplodeRatio(val);
+            });
+
+            const btnFlight = document.getElementById('btn-toggle-flight');
+            const wrapperSpeed = document.getElementById('wrapper-speed');
+            const txtFlight = document.getElementById('txt-flight-state');
+
+            if (isFlying) {
+                btnFlight.classList.add('active');
+                txtFlight.innerText = "暫停飛行動畫";
+                wrapperSpeed.classList.remove('opacity-50', 'pointer-events-none');
+            }
+
+            btnFlight.addEventListener('click', () => {
+                isFlying = !isFlying;
+                btnFlight.classList.toggle('active', isFlying);
+                txtFlight.innerText = isFlying ? "暫停飛行動畫" : "開啟飛行動畫";
+
+                if (isFlying) {
+                    wrapperSpeed.classList.remove('opacity-50', 'pointer-events-none');
+                } else {
+                    wrapperSpeed.classList.add('opacity-50', 'pointer-events-none');
+                    gsap.to(butterflyGroup.position, { y: 0, duration: 0.5 });
+                    gsap.to(butterflyGroup.rotation, { x: 0, duration: 0.5 });
+                    Object.keys(butterflyParts).forEach(key => {
+                        const part = butterflyParts[key];
+                        gsap.to(part.rotation, { x: part.userData.defaultRot.x, y: part.userData.defaultRot.y, z: part.userData.defaultRot.z, duration: 0.5 });
+                    });
+                }
+            });
+
+            document.getElementById('slider-speed').addEventListener('input', (e) => {
+                flightSpeed = parseFloat(e.target.value);
+                document.getElementById('val-speed').innerText = `${flightSpeed.toFixed(1)} Hz (${flightSpeed <= 2.0 ? '教學慢放' : '真實速比'})`;
+            });
+
+            document.getElementById('btn-toggle-blueprint').addEventListener('click', toggleBlueprintMode);
+
+            document.getElementById('btn-assemble-quick').addEventListener('click', () => {
+                sliderExplode.value = 0;
+                setExplodeRatio(0);
+            });
+
+            document.getElementById('btn-explode-quick').addEventListener('click', () => {
+                sliderExplode.value = 100;
+                setExplodeRatio(1.0);
+            });
+
+            document.getElementById('btn-reset-view').addEventListener('click', () => {
+                gsap.to(camera.position, { x: 0, y: 3.8, z: 8.5, duration: 0.8 });
+                controls.target.set(0, 0, 0);
+            });
+
+            const panel = document.getElementById('control-panel');
+            const btnCollapse = document.getElementById('btn-collapse-panel');
+            const iconCollapse = document.getElementById('icon-collapse');
+            let isCollapsed = false;
+
+            btnCollapse.addEventListener('click', () => {
+                isCollapsed = !isCollapsed;
+                panel.classList.toggle('panel-collapsed', isCollapsed);
+                iconCollapse.className = isCollapsed ? "ph-light ph-caret-up text-lg" : "ph-light ph-caret-down text-lg";
+            });
+        }
+
+        function updateFlightKinematics(dt) {
+            if (!isFlying) return;
+
+            flightTime += dt * flightSpeed * Math.PI * 2;
+
+            const flapAngle = Math.sin(flightTime) * 0.55;
+            const hindFlapAngle = Math.sin(flightTime - 0.35) * 0.48;
+
+            if (butterflyParts.forewingL) butterflyParts.forewingL.rotation.z = flapAngle;
+            if (butterflyParts.forewingR) butterflyParts.forewingR.rotation.z = -flapAngle;
+            if (butterflyParts.hindwingL) butterflyParts.hindwingL.rotation.z = hindFlapAngle;
+            if (butterflyParts.hindwingR) butterflyParts.hindwingR.rotation.z = -hindFlapAngle;
+
+            if (butterflyParts.abdomen) {
+                butterflyParts.abdomen.rotation.x = Math.sin(flightTime * 0.5) * 0.08 - 0.1;
+            }
+
+            butterflyGroup.position.y = Math.sin(flightTime * 0.5) * 0.18;
+            butterflyGroup.rotation.x = Math.sin(flightTime * 0.25) * 0.05;
+        }
+
+        const partDescriptions = {
+            ForewingL: { title: "左前翅 (Forewing)", code: "FW-LEFT", desc: "前翅呈長三角形，頂角較圓潤。翅面為深黑褐色半透明鱗片覆蓋，翅脈之間帶有細緻的金灰色微粉光澤線條，外緣排列著乳白色微小邊點。" },
+            ForewingR: { title: "右前翅 (Forewing)", code: "FW-RIGHT", desc: "前翅呈長三角形，頂角較圓潤。翅面為深黑褐色半透明鱗片覆蓋，翅脈之間帶有細緻的金灰色微粉光澤線條，外緣排列著乳白色微小邊點。" },
+            HindwingL: { title: "左後翅 (Hindwing)", code: "HW-LEFT", desc: "雄蝶標誌性的象牙白「玉帶」斑塊橫跨後翅中區。外緣具波浪狀鋸齒與白色緣毛，尾端具狹長匙狀尾突（Swallowtail）。" },
+            HindwingR: { title: "右後翅 (Hindwing)", code: "HW-RIGHT", desc: "雄蝶標誌性的象牙白「玉帶」斑塊橫跨後翅中區。外緣具波浪狀鋸齒與白色緣毛，尾端具狹長匙狀尾突（Swallowtail）。" },
+            Head: { title: "頭部與複眼 (Head & Eyes)", code: "ANAT-HEAD", desc: "頭部兩側具發達的半球形複眼，側面與頸部帶有玉帶鳳蝶特有的白色斑點斑紋。下方具自然捲曲的管狀口器（Proboscis）。" },
+            Thorax: { title: "胸部 (Thorax)", code: "ANAT-THORAX", desc: "胸部為強大的肌肉樞紐，負責驅動前後翅的三軸撲翼與體壁壓縮。側壁分佈有數點清晰的白點。" },
+            Abdomen: { title: "腹部 (Abdomen)", code: "ANAT-ABDO", desc: "由 7 個明顯的幾丁質節環組成，飛行時會進行反向微幅彎曲以維持氣動力學重心平衡。" }
+        };
+
+        function onPointerClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(butterflyGroup.children, true);
+
+            if (intersects.length > 0) {
+                let obj = intersects[0].object;
+                while (obj.parent && obj.parent !== butterflyGroup && !obj.name) {
+                    obj = obj.parent;
+                }
+
+                const name = obj.name || (obj.parent ? obj.parent.name : null);
+                if (name && partDescriptions[name]) {
+                    const info = partDescriptions[name];
+                    document.getElementById('inspect-part-title').innerText = info.title;
+                    document.getElementById('inspect-part-code').innerText = info.code;
+                    document.getElementById('inspect-part-desc').innerText = info.desc;
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const dt = clock.getDelta();
+            updateFlightKinematics(dt);
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = () => {
+            init3DScene();
+        };
+    </script>
+</body>
+</html>
